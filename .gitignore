@@ -1,1 +1,6 @@
 .direnv
+build/
+deps/*
+!deps/patches/
+*.c
+*.so
