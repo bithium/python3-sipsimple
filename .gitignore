@@ -4,3 +4,4 @@ deps/*
 !deps/patches/
 *.c
 *.so
+__pycache__/*
