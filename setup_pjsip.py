@@ -283,8 +283,16 @@ class build_ext(cython_build_ext):
         if self.verbose and sys_platform == "darwin":
             log.info(os.environ["CFLAGS"])
             log.info(os.environ["LDFLAGS"])
+
+        cmd = [self.get_make_cmd()]
+        if self.parallel is not None:
+            cmd.append("-j")
+            cmd.append(f"{self.parallel}")
+
         self.distutils_exec_process(
-            [self.get_make_cmd()], silent=not self.verbose, cwd=self.build_dir
+            cmd,
+            silent=not self.verbose,
+            cwd=self.build_dir,
         )
 
     def clean_pjsip(self):
