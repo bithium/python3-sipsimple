@@ -13,7 +13,7 @@ from application.notification import IObserver, NotificationCenter, Notification
 from application.python import Null
 from zope.interface import implementer
 
-from sipsimple.core._core import ContactHeader, Header, Request, RouteHeader, SIPCoreError, SIPURI, ToHeader
+from sipsimple.core._pjsip import ContactHeader, Header, Request, RouteHeader, SIPCoreError, SIPURI, ToHeader
 
 
 @implementer(IObserver)

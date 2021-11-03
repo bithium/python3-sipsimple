@@ -1,6 +1,60 @@
+# cython: language_level=3
+# distutils: define_macros=CYTHON_NO_PYINIT_EXPORT
 
 import weakref
 
+from cpython.ref cimport Py_INCREF
+from cpython.bytes cimport PyBytes_FromStringAndSize
+
+from .error import PJSIPError, SIPCoreError
+from .util import decode_device_name
+from ._pjsip cimport (
+    PJMEDIA_DIR_CAPTURE,
+    PJMEDIA_DIR_CAPTURE_PLAYBACK,
+    PJMEDIA_DIR_DECODING,
+    PJMEDIA_DIR_ENCODING,
+    PJMEDIA_DIR_RENDER,
+    PJMEDIA_EVENT_FMT_CHANGED,
+    PJMEDIA_EVENT_KEYFRAME_FOUND,
+    PJMEDIA_EVENT_KEYFRAME_MISSING,
+    PJMEDIA_EVENT_KEYFRAME_REQUESTED,
+    PJMEDIA_VID_DEFAULT_CAPTURE_DEV,
+    pj_mutex_create_recursive,
+    pj_mutex_destroy,
+    pj_mutex_lock,
+    pj_mutex_unlock,
+    pjmedia_event_subscribe,
+    pjmedia_event_unsubscribe,
+    pjmedia_format,
+    pjmedia_frame_ptr_const,
+    pjmedia_port_destroy,
+    pjmedia_rect_size,
+    pjmedia_vid_dev_count,
+    pjmedia_vid_dev_default_param,
+    pjmedia_vid_dev_fb_set_callback,
+    pjmedia_vid_dev_get_info,
+    pjmedia_vid_dev_info,
+    pjmedia_vid_dev_lookup,
+    pjmedia_vid_dev_param,
+    pjmedia_vid_dev_stream_get_param,
+    pjmedia_vid_port_connect,
+    pjmedia_vid_port_create,
+    pjmedia_vid_port_destroy,
+    pjmedia_vid_port_disconnect,
+    pjmedia_vid_port_get_passive_port,
+    pjmedia_vid_port_get_stream,
+    pjmedia_vid_port_param,
+    pjmedia_vid_port_param_default,
+    pjmedia_vid_port_start,
+    pjmedia_vid_port_stop,
+    pjmedia_vid_stream_get_info,
+    pjmedia_vid_stream_get_port,
+    pjmedia_vid_stream_info,
+    pjmedia_vid_tee_add_dst_port2,
+    pjmedia_vid_tee_create,
+    pjmedia_vid_tee_remove_dst_port,
+)
+from .ua cimport PJSIPUA, Timer, deallocate_weakref, _get_ua
 
 cdef class VideoProducer:
 
@@ -1049,4 +1103,3 @@ cdef int RemoteVideoStream_on_event(pjmedia_event *event, void *user_data) with 
             # Pacify compiler
             pass
     return 0
-

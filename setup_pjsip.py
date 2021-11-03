@@ -4,13 +4,13 @@ import os
 import platform
 import re
 import shutil
-import subprocess
+import subprocess  # nosec
 import sys
 from distutils import log
 from distutils.dir_util import copy_tree
 from distutils.errors import DistutilsError
 
-from Cython.Distutils import build_ext
+from Cython.Distutils.build_ext import new_build_ext as cython_build_ext
 
 if sys.platform.startswith("linux"):
     sys_platform = "linux"
@@ -28,7 +28,7 @@ if sys_platform == "darwin":
     min_osx_version = "10.11"
     try:
         osx_sdk_path = (
-            subprocess.check_output(
+            subprocess.check_output(  # nosec
                 ["xcodebuild", "-version", "-sdk", "macosx", "Path"]
             )
             .decode()
@@ -78,7 +78,7 @@ if sys_platform == "darwin":
     os.environ["MACOSX_DEPLOYMENT_TARGET"] = min_osx_version
 
 
-class PJSIP_build_ext(build_ext):
+class build_ext(cython_build_ext):
     config_site = [
         "#define PJ_SCANNER_USE_BITWISE 0",
         "#define PJSIP_SAFE_MODULE 0",
@@ -121,14 +121,14 @@ class PJSIP_build_ext(build_ext):
         "#define PJMEDIA_VIDEO_DEV_HAS_NULL 1",
     ]
 
-    user_options = build_ext.user_options
+    user_options = cython_build_ext.user_options
     user_options.extend(
         [
             ("clean", None, "Clean PJSIP tree before compilation"),
             ("verbose", None, "Print output of PJSIP compilation process"),
         ]
     )
-    boolean_options = build_ext.boolean_options
+    boolean_options = cython_build_ext.boolean_options
     boolean_options.extend(["clean", "verbose"])
 
     @staticmethod
@@ -136,12 +136,12 @@ class PJSIP_build_ext(build_ext):
         """Execute a subprocess and returns the returncode, stdout buffer and stderr buffer.
         Optionally prints stdout and stderr while running."""
         try:
-            sub = subprocess.Popen(
+            sub = subprocess.Popen(  # nosec
                 cmdline,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                **kwargs
+                **kwargs,
             )
             stdout, stderr = sub.communicate(input=input)
             returncode = sub.returncode
@@ -198,7 +198,7 @@ class PJSIP_build_ext(build_ext):
             raise
 
     def initialize_options(self):
-        build_ext.initialize_options(self)
+        cython_build_ext.initialize_options(self)
         self.clean = 0
         self.verbose = 0
         self.pjsip_dir = os.path.join(os.path.dirname(__file__), "deps", "pjsip")
@@ -303,6 +303,10 @@ class PJSIP_build_ext(build_ext):
         extension.include_dirs = self.get_opts_from_string(
             build_mak_vars["PJ_CFLAGS"], "-I"
         )
+        srcdir = os.path.dirname(__file__)
+        extension.include_dirs.append(os.path.join(srcdir, "sipsimple", "core"))
+        extension.include_dirs.append(".")
+
         extension.library_dirs = self.get_opts_from_string(
             build_mak_vars["PJ_LDFLAGS"], "-L"
         )
@@ -312,13 +316,14 @@ class PJSIP_build_ext(build_ext):
         extension.define_macros = [
             tuple(define.split("=", 1))
             for define in self.get_opts_from_string(build_mak_vars["PJ_CFLAGS"], "-D")
-        ]
+        ] + [("CYTHON_NO_PYINIT_EXPORT", 1)]
         extension.define_macros.append(
             (
                 "PJ_SVN_REVISION",
                 open(os.path.join(self.build_dir, "base_rev"), "r").read().strip(),
             )
         )
+        # extension.define_macros.append(("CYTHON_NO_PYINIT_EXPORT", "1"))
         # extension.define_macros.append(("__PYX_FORCE_INIT_THREADS", 1))
         extension.extra_compile_args.append("-Wno-unused-function")  # silence warning
 
@@ -342,21 +347,28 @@ class PJSIP_build_ext(build_ext):
             extension.include_dirs.append("%s/usr/include" % osx_sdk_path)
 
         extension.depends = build_mak_vars["PJ_LIB_FILES"].split()
+
         self.libraries = extension.depends[:]
 
-    def cython_sources(self, sources, extension, silent=True):
-        log.info("Compiling Cython extension %s" % extension.name)
+    def finalize_options(self):
+        cython_build_ext.finalize_options(self)
+        self.build_dir = os.path.join(self.build_temp, "pjsip")
+
+    def build_extension(self, extension):
+        log.info(f"Compiling Cython extension {extension.name}")
         if extension.name == "sipsimple.core._core":
-            self.build_dir = os.path.join(self.build_temp, "pjsip")
             if self.clean:
                 self.clean_pjsip()
+            self.mkpath(self.build_dir)
             copy_tree(self.pjsip_dir, self.build_dir, verbose=0)
             try:
                 if not os.path.exists(os.path.join(self.build_dir, "build.mak")):
-                    self.configure_pjsip(silent=silent)
-                self.update_extension(extension, silent=silent)
+                    self.configure_pjsip(silent=True)
                 self.compile_pjsip()
             except RuntimeError as e:
                 log.info("Error building %s: %s" % (extension.name, str(e)))
-                return None
-        return build_ext.cython_sources(self, sources, extension)
+                raise e
+
+            self.update_extension(extension)
+
+        cython_build_ext.build_extension(self, extension)

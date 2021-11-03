@@ -1,5 +1,114 @@
+# cython: language_level=3
+# distutils: define_macros=CYTHON_NO_PYINIT_EXPORT
 
 import re
+
+from .error import PJSIPError, SIPCoreError, SIPCoreInvalidStateError
+
+from ._pjsip cimport (
+    PJSIP_EVENT_RX_MSG,
+    PJSIP_EVENT_TSX_STATE,
+    PJSIP_EVENT_TX_MSG,
+    PJSIP_EVSUB_NO_EVENT_ID,
+    PJSIP_EVSUB_STATE_ACTIVE,
+    PJSIP_EVSUB_STATE_PENDING,
+    PJSIP_EVSUB_STATE_TERMINATED,
+    PJSIP_H_EXPIRES,
+    PJSIP_PARSE_URI_AS_NAMEADDR,
+    PJSIP_ROLE_UAC,
+    PJSIP_ROLE_UAS,
+    PJSIP_SC_TSX_TIMEOUT,
+    PJSIP_TSX_STATE_COMPLETED,
+    PJSIP_TSX_STATE_TERMINATED,
+    pj_timer_heap_t,
+    pjsip_cred_info,
+    pjsip_event_hdr,
+    pjsip_evsub_state,
+    pjsip_evsub_user,
+    pjsip_expires_hdr,
+    pjsip_generic_int_hdr,
+    pjsip_generic_string_hdr,
+    pjsip_method,
+    pjsip_sub_state_hdr,
+    pjsip_tpselector,
+    pjsip_uri,
+    pj_AF_INET,
+    pj_list_init,
+    pj_list_insert_after,
+    pj_strdup2_with_null,
+    pj_timer_entry_init,
+    pjsip_auth_clt_set_credentials,
+    pjsip_contact_hdr_create,
+    pjsip_dlg_create_response,
+    pjsip_dlg_create_uac,
+    pjsip_dlg_create_uas_and_inc_lock,
+    pjsip_dlg_dec_lock,
+    pjsip_dlg_dec_session,
+    pjsip_dlg_inc_lock,
+    pjsip_dlg_inc_session,
+    pjsip_dlg_modify_response,
+    pjsip_dlg_send_response,
+    pjsip_dlg_set_route_set,
+    pjsip_endpt_cancel_timer,
+    pjsip_endpt_create_response,
+    pjsip_endpt_schedule_timer,
+    pjsip_endpt_send_response2,
+    pjsip_event_hdr_create,
+    pjsip_evsub_create_uac,
+    pjsip_evsub_create_uas,
+    pjsip_evsub_get_mod_data,
+    pjsip_evsub_get_state_name,
+    pjsip_evsub_initiate,
+    pjsip_evsub_notify,
+    pjsip_evsub_send_request,
+    pjsip_evsub_set_mod_data,
+    pjsip_evsub_terminate,
+    pjsip_evsub_update_expires,
+    pjsip_method_init_np,
+    pjsip_msg_add_hdr,
+    pjsip_msg_body_create,
+    pjsip_msg_find_hdr,
+    pjsip_msg_find_hdr_by_name,
+    pjsip_parse_uri,
+    pjsip_rdata_get_tsx,
+    pjsip_tsx_terminate,
+    pjsip_tx_data_dec_ref,
+    pjsip_ua_instance,
+)
+
+from .event cimport _add_event
+
+from .headers cimport (
+    BaseContactHeader,
+    ContactHeader,
+    FromHeader,
+    FrozenContactHeader,
+    FrozenFromHeader_create,
+    FrozenReferToHeader,
+    FrozenRouteHeader,
+    FrozenToHeader,
+    FrozenToHeader_create,
+    Header,
+    ReferToHeader,
+    RouteHeader,
+    ToHeader,
+    _BaseRouteHeader_to_pjsip_route_hdr,
+)
+from .helper cimport Credentials, FrozenCredentials, FrozenSIPURI, SIPURI
+from .request cimport EndpointAddress
+from .ua cimport PJSIPUA, _get_ua, _event_hdr_name
+from .util cimport (
+    PJSTR,
+    _add_headers_to_tdata,
+    _dict_to_pjsip_param,
+    _is_valid_ip,
+    _pj_str_to_str,
+    _pjsip_msg_to_dict,
+    _remove_headers_from_tdata,
+    frozendict,
+    frozenlist,
+)
+
 
 cdef class Referral:
     expire_warning_time = 30
@@ -1001,4 +1110,3 @@ cdef PJSTR _refer_event = PJSTR(b"refer")
 cdef PJSTR _refer_to_hdr_name = PJSTR(b"Refer-To")
 cdef PJSTR _refer_sub_hdr_name = PJSTR(b"Refer-Sub")
 cdef PJSTR _subscription_state_hdr_name = PJSTR(b"Subscription-State")
-

@@ -1,7 +1,157 @@
+# cython: language_level=3
+# distutils: define_macros=CYTHON_NO_PYINIT_EXPORT
 
 import sys
+import weakref
 
 from errno import EADDRINUSE
+
+from libc.stdlib cimport free
+
+# Python C imports
+
+from cpython.ref cimport Py_INCREF
+from ._pjsip cimport PyUnicode_FromString
+
+from .error import PJSIPError, SIPCoreError
+
+from ._pjsip cimport (
+    PJMEDIA_DIR_CAPTURE,
+    PJMEDIA_DIR_CAPTURE_RENDER,
+    PJMEDIA_DIR_RENDER,
+    PJMEDIA_SRTP_MANDATORY,
+    PJMEDIA_TRANSPORT_TYPE_ICE,
+    PJMEDIA_TRANSPORT_TYPE_SRTP,
+    PJMEDIA_TRANSPORT_TYPE_ZRTP,
+    PJ_EBUG,
+    PJ_ERRNO_START_SYS,
+    PJ_ICE_CAND_TYPE_HOST,
+    PJ_ICE_CAND_TYPE_PRFLX,
+    PJ_ICE_CAND_TYPE_RELAYED,
+    PJ_ICE_CAND_TYPE_SRFLX,
+    PJ_ICE_SESS_CHECK_STATE_FAILED,
+    PJ_ICE_SESS_CHECK_STATE_FROZEN,
+    PJ_ICE_SESS_CHECK_STATE_IN_PROGRESS,
+    PJ_ICE_SESS_CHECK_STATE_SUCCEEDED,
+    PJ_ICE_SESS_CHECK_STATE_WAITING,
+    PJ_ICE_STRANS_OP_INIT,
+    PJ_ICE_STRANS_OP_NEGOTIATION,
+    PJ_ICE_STRANS_STATE_FAILED,
+    PJ_ICE_STRANS_STATE_INIT,
+    PJ_ICE_STRANS_STATE_NEGO,
+    PJ_ICE_STRANS_STATE_NULL,
+    PJ_ICE_STRANS_STATE_READY,
+    PJ_ICE_STRANS_STATE_RUNNING,
+    PJ_ICE_STRANS_STATE_SESS_READY,
+    PJ_INET6_ADDRSTRLEN,
+    PJ_STUN_PORT,
+    pj_AF_INET,
+    pj_caching_pool,
+    pj_gettimeofday,
+    pj_ice_sess_check_ptr_const,
+    pj_ice_strans,
+    pj_ice_strans_cfg,
+    pj_ice_strans_cfg_default,
+    pj_ice_strans_get_session,
+    pj_ice_strans_get_start_time,
+    pj_ice_strans_get_state,
+    pj_ice_strans_get_valid_pair,
+    pj_mutex_create_recursive,
+    pj_mutex_destroy,
+    pj_mutex_lock,
+    pj_mutex_unlock,
+    pj_sockaddr,
+    pj_sockaddr_get_port,
+    pj_sockaddr_has_addr,
+    pj_sockaddr_init,
+    pj_sockaddr_print,
+    pj_str_t,
+    pj_stun_config_init,
+    pj_time_val,
+    pj_time_val_normalize,
+    pjmedia_conf,
+    pjmedia_conf_adjust_rx_level,
+    pjmedia_dir,
+    pjmedia_endpt,
+    pjmedia_endpt_create_audio_sdp,
+    pjmedia_endpt_create_base_sdp,
+    pjmedia_endpt_create_video_sdp,
+    pjmedia_endpt_get_ioqueue,
+    pjmedia_ice_cb,
+    pjmedia_ice_create2,
+    pjmedia_ice_get_strans,
+    pjmedia_ice_transport_info,
+    pjmedia_port,
+    pjmedia_rtcp_stat,
+    pjmedia_sdp_media,
+    pjmedia_sdp_session,
+    pjmedia_srtp_info,
+    pjmedia_srtp_setting,
+    pjmedia_srtp_setting_default,
+    pjmedia_stream_create,
+    pjmedia_stream_destroy,
+    pjmedia_stream_dial_dtmf,
+    pjmedia_stream_get_port,
+    pjmedia_stream_get_stat,
+    pjmedia_stream_info_from_sdp,
+    pjmedia_stream_set_dtmf_callback,
+    pjmedia_stream_start,
+    pjmedia_transport_close,
+    pjmedia_transport_encode_sdp,
+    pjmedia_transport_get_info,
+    pjmedia_transport_info_get_spc_info,
+    pjmedia_transport_info_init,
+    pjmedia_transport_media_create,
+    pjmedia_transport_media_start,
+    pjmedia_transport_media_stop,
+    pjmedia_transport_srtp_create,
+    pjmedia_transport_udp_create3,
+    pjmedia_transport_zrtp_create,
+    pjmedia_transport_zrtp_getMultiStreamParameters,
+    pjmedia_transport_zrtp_getPeerName,
+    pjmedia_transport_zrtp_getPeerZid,
+    pjmedia_transport_zrtp_initialize,
+    pjmedia_transport_zrtp_putPeerName,
+    pjmedia_transport_zrtp_setEnableZrtp,
+    pjmedia_transport_zrtp_setMultiStreamParameters,
+    pjmedia_transport_zrtp_setSASVerified,
+    pjmedia_vid_stream_create,
+    pjmedia_vid_stream_destroy,
+    pjmedia_vid_stream_get_stat,
+    pjmedia_vid_stream_info_from_sdp,
+    pjmedia_vid_stream_pause,
+    pjmedia_vid_stream_resume,
+    pjmedia_vid_stream_send_keyframe,
+    pjmedia_vid_stream_send_rtcp_bye,
+    pjmedia_vid_stream_send_rtcp_pli,
+    pjmedia_vid_stream_send_rtcp_sdes,
+    pjmedia_vid_stream_start,
+    pjmedia_zrtp_cb,
+    pjmedia_zrtp_info,
+    pjsip_endpoint,
+    pjsip_endpt_get_timer_heap,
+)
+
+from .event cimport _add_event
+from .video cimport LocalVideoStream_create, RemoteVideoStream_create
+from .sound cimport AudioMixer
+from .sdp cimport (
+    BaseSDPMediaStream,
+    BaseSDPSession,
+    SDPAttribute,
+    SDPMediaStream,
+    SDPSession,
+    SDPConnection,
+    SDPSession_create
+)
+from .ua cimport PJSIPUA, Timer, timer_callback, _get_ua, deallocate_weakref
+from .util cimport (
+    _buf_to_str,
+    _pj_buf_len_to_str,
+    _pj_status_to_str,
+    _pj_str_to_bytes,
+    _str_to_pj_str,
+)
 
 
 # classes
@@ -2556,4 +2706,3 @@ cdef dict zrtp_error_messages = {
         0x7fffffff: "Packet ignored",                                 #IgnorePacket
     }
 }
-

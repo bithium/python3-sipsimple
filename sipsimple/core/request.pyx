@@ -1,5 +1,92 @@
+# cython: language_level=3
+# distutils: define_macros=CYTHON_NO_PYINIT_EXPORT
 
 from datetime import datetime, timedelta
+
+from .error import PJSIPError, SIPCoreError, SIPCoreInvalidStateError
+
+from ._pjsip cimport (
+    PJSIP_EVENT_RX_MSG,
+    PJSIP_EVENT_RX_MSG,
+    PJSIP_EVENT_TSX_STATE,
+    PJSIP_H_CALL_ID,
+    PJSIP_H_CONTACT,
+    PJSIP_H_CSEQ,
+    PJSIP_H_FROM,
+    PJSIP_TSX_STATE_COMPLETED,
+    PJSIP_TSX_STATE_PROCEEDING,
+    PJSIP_TSX_STATE_TERMINATED,
+    pj_list,
+    pj_str_t,
+    pj_strdup2_with_null,
+    pj_time_val,
+    pj_timer_entry,
+    pj_timer_entry_init,
+    pj_timer_heap_t,
+    pjsip_auth_clt_init,
+    pjsip_auth_clt_reinit_req,
+    pjsip_auth_clt_sess,
+    pjsip_auth_clt_set_credentials,
+    pjsip_cid_hdr,
+    pjsip_contact_hdr,
+    pjsip_cseq_hdr,
+    pjsip_endpt_cancel_timer,
+    pjsip_endpt_create_request,
+    pjsip_endpt_create_response,
+    pjsip_endpt_schedule_timer,
+    pjsip_event,
+    pjsip_fromto_hdr,
+    pjsip_get_status_text,
+    pjsip_hdr,
+    pjsip_method,
+    pjsip_method_init_np,
+    pjsip_msg_add_hdr,
+    pjsip_msg_body_create,
+    pjsip_msg_find_hdr,
+    pjsip_route_hdr,
+    pjsip_rx_data,
+    pjsip_transaction,
+    pjsip_tsx_create_uac,
+    pjsip_tsx_create_uas,
+    pjsip_tsx_recv_msg,
+    pjsip_tsx_send_msg,
+    pjsip_tsx_terminate,
+    pjsip_tx_data,
+    pjsip_tx_data_add_ref,
+    pjsip_tx_data_dec_ref,
+)
+
+from .event cimport _add_event
+from .headers cimport (
+    ContactHeader,
+    FromHeader,
+    FrozenContactHeader,
+    FrozenFromHeader_create,
+    FrozenRouteHeader,
+    FrozenToHeader,
+    FrozenToHeader_create,
+    RouteHeader,
+    ToHeader,
+    _BaseRouteHeader_to_pjsip_route_hdr,
+)
+from .helper cimport (
+    Credentials,
+    FrozenCredentials,
+    FrozenSIPURI,
+    SIPURI,
+)
+from .ua cimport PJSIPUA, _get_ua
+from .util cimport (
+    PJSTR,
+    _add_headers_to_tdata,
+    _dict_to_pjsip_param,
+    _pj_status_to_str,
+    _pj_str_to_bytes,
+    _pj_str_to_str,
+    _pjsip_msg_to_dict,
+    frozenlist,
+)
+
 
 
 cdef class EndpointAddress:
@@ -148,7 +235,7 @@ cdef class Request:
 
         status = _BaseRouteHeader_to_pjsip_route_hdr(self.route_header, &self._route_header, self._tdata.pool)
         pjsip_msg_add_hdr(self._tdata.msg, <pjsip_hdr *> &self._route_header)
-        
+
         hdr = <pjsip_hdr *> (<pj_list *> &self._tdata.msg.hdr).next
         while hdr != &self._tdata.msg.hdr:
             hdr_name = _pj_str_to_str(hdr.name)
@@ -501,5 +588,3 @@ cdef void _Request_cb_timer(pj_timer_heap_t *timer_heap, pj_timer_entry *entry) 
             req._cb_timer(ua)
     except:
         ua._handle_exception(1)
-
-

@@ -1,8 +1,46 @@
+# cython: language_level=3
+# distutils: define_macros=CYTHON_NO_PYINIT_EXPORT
 
 import re
 
 from application.python.descriptor import WriteOnceAttribute
 
+from .error import PJSIPError, SIPCoreError
+
+from ._pjsip cimport (
+    PJMEDIA_MAX_SDP_ATTR,
+    PJMEDIA_MAX_SDP_BANDW,
+    PJMEDIA_MAX_SDP_FMT,
+    PJMEDIA_MAX_SDP_MEDIA,
+    pj_gettimeofday,
+    pj_time_val,
+    pjmedia_sdp_neg_create_w_local_offer,
+    pjmedia_sdp_neg_create_w_remote_offer,
+    pjmedia_sdp_parse,
+    pjmedia_sdp_print,
+    pjmedia_sdp_neg_state_str,
+    pjmedia_sdp_neg_get_state,
+    pjmedia_sdp_neg_get_active_local,
+    pjmedia_sdp_neg_get_active_remote,
+    pjmedia_sdp_neg_get_neg_local,
+    pjmedia_sdp_neg_get_neg_remote,
+    pjmedia_sdp_neg_set_local_answer,
+    pjmedia_sdp_neg_modify_local_offer,
+    pjmedia_sdp_neg_set_remote_answer,
+    pjmedia_sdp_neg_set_remote_offer,
+    pjmedia_sdp_neg_cancel_offer,
+    pjmedia_sdp_neg_negotiate,
+)
+from .ua cimport PJSIPUA, _get_ua
+from .util cimport (
+    _buf_to_str,
+    _pj_buf_len_to_str,
+    _pj_str_to_bytes,
+    _str_as_size,
+    _str_as_str,
+    _str_to_pj_str,
+    frozenlist,
+)
 
 cdef object BaseSDPSession_richcmp(object self, object other, int op) with gil:
     cdef int eq = 1
@@ -1222,4 +1260,3 @@ cdef class SDPNegotiator:
         status = pjmedia_sdp_neg_negotiate(pool, self._neg, 0)
         if status != 0:
             raise PJSIPError("SDP negotiation failed", status)
-

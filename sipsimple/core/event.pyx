@@ -1,3 +1,17 @@
+# cython: language_level=3
+# distutils: define_macros=CYTHON_NO_PYINIT_EXPORT
+
+from cpython.ref cimport Py_INCREF, Py_DECREF
+
+from libc.stdlib cimport malloc, free
+from libc.string cimport memcpy
+
+from .error import PJSIPError
+
+from ._pjsip cimport pj_mutex_t, pj_mutex_lock, pj_mutex_unlock
+from .util cimport _pj_buf_len_to_str
+from .ua cimport PJSIPUA
+
 
 # C types
 

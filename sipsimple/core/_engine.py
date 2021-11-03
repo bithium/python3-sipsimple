@@ -15,7 +15,7 @@ from application.python.types import Singleton
 from threading import Thread, RLock
 
 from sipsimple import log, __version__
-from sipsimple.core._core import PJSIPUA, PJ_VERSION, PJ_SVN_REVISION, SIPCoreError
+from sipsimple.core._pjsip import PJSIPUA, PJ_VERSION, PJ_SVN_REVISION, SIPCoreError
 
 
 class Engine(Thread, metaclass=Singleton):

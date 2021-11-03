@@ -1,5 +1,83 @@
+# cython: language_level=3
+# distutils: define_macros=CYTHON_NO_PYINIT_EXPORT
 
 import sys
+import weakref
+
+from cpython.ref cimport Py_INCREF
+from cpython.bytes cimport PyBytes_AsString
+
+from .error import PJSIPError, SIPCoreError
+from .util import decode_device_name
+
+from ._pjsip cimport (
+    PJMEDIA_AUD_DEFAULT_CAPTURE_DEV,
+    PJMEDIA_AUD_DEFAULT_PLAYBACK_DEV,
+    PJMEDIA_AUD_DEV_CAP_EC,
+    PJMEDIA_AUD_DEV_CAP_EC_TAIL,
+    PJMEDIA_CONF_NO_DEVICE,
+    PJMEDIA_DIR_CAPTURE,
+    PJMEDIA_DIR_CAPTURE_PLAYBACK,
+    PJMEDIA_DIR_PLAYBACK,
+    PJMEDIA_ENOSNDPLAY,
+    PJMEDIA_ENOSNDREC,
+    PJMEDIA_FILE_NO_LOOP,
+    PJMEDIA_FILE_WRITE_PCM,
+    PJMEDIA_TONEGEN_MAX_DIGITS,
+    PJ_ETOOMANY,
+    pj_mutex_create_recursive,
+    pj_mutex_destroy,
+    pj_mutex_lock,
+    pj_mutex_t,
+    pj_mutex_unlock,
+    pj_pool_t,
+    pj_rwmutex_lock_read,
+    pj_rwmutex_unlock_read,
+    pjmedia_aud_dev_count,
+    pjmedia_aud_dev_default_param,
+    pjmedia_aud_dev_get_info,
+    pjmedia_aud_dev_info,
+    pjmedia_aud_param,
+    pjmedia_aud_stream_get_param,
+    pjmedia_conf,
+    pjmedia_conf_add_port,
+    pjmedia_conf_adjust_rx_level,
+    pjmedia_conf_adjust_tx_level,
+    pjmedia_conf_connect_port,
+    pjmedia_conf_create,
+    pjmedia_conf_destroy,
+    pjmedia_conf_disconnect_port,
+    pjmedia_conf_get_master_port,
+    pjmedia_conf_remove_port,
+    pjmedia_master_port,
+    pjmedia_master_port_create,
+    pjmedia_master_port_destroy,
+    pjmedia_master_port_start,
+    pjmedia_mixer_port_create,
+    pjmedia_null_port_create,
+    pjmedia_port,
+    pjmedia_port_destroy,
+    pjmedia_snd_port,
+    pjmedia_snd_port_connect,
+    pjmedia_snd_port_create2,
+    pjmedia_snd_port_destroy,
+    pjmedia_snd_port_get_snd_stream,
+    pjmedia_snd_port_param,
+    pjmedia_snd_port_param_default,
+    pjmedia_snd_port_reset_ec_state,
+    pjmedia_tone_desc,
+    pjmedia_tone_digit,
+    pjmedia_tonegen_create,
+    pjmedia_tonegen_is_busy,
+    pjmedia_tonegen_play,
+    pjmedia_tonegen_play_digits,
+    pjmedia_tonegen_stop,
+    pjmedia_wav_player_port_create,
+    pjmedia_wav_player_set_eof_cb,
+    pjmedia_wav_writer_port_create,
+)
+from .event cimport _add_event, _add_handler, _remove_handler, _dealloc_handler_queue
+from .ua cimport PJSIPUA, Timer, _get_ua, deallocate_weakref, timer_callback
 
 
 cdef class AudioMixer:
@@ -1379,4 +1457,3 @@ cdef int cb_play_wav_eof(pjmedia_port *port, void *user_data) with gil:
         timer.schedule(0, <timer_callback>wav_file._cb_eof, wav_file)
     # do not return PJ_SUCCESS because if you do pjsip will access the just deallocated port
     return 1
-

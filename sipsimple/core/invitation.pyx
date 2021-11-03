@@ -1,8 +1,175 @@
+# cython: language_level=3
 
 import weakref
 
 from errno import EADDRNOTAVAIL, ENETUNREACH
 from operator import itemgetter
+
+from cpython.ref cimport Py_INCREF, Py_DECREF
+
+from .error import PJSIPError, SIPCoreError, SIPCoreInvalidStateError
+
+from ._pjsip cimport (
+    PJMEDIA_SDP_NEG_ALLOW_MEDIA_CHANGE,
+    PJMEDIA_SDP_NEG_STATE_DONE,
+    PJMEDIA_SDP_NEG_STATE_LOCAL_OFFER,
+    PJMEDIA_SDP_NEG_STATE_REMOTE_OFFER,
+    PJSIP_CANCEL_METHOD,
+    PJSIP_EVENT_RX_MSG,
+    PJSIP_EVENT_TRANSPORT_ERROR,
+    PJSIP_EVENT_TSX_STATE,
+    PJSIP_EVENT_TX_MSG,
+    PJSIP_EVSUB_NO_EVENT_ID,
+    PJSIP_EVSUB_STATE_ACTIVE,
+    PJSIP_EVSUB_STATE_TERMINATED,
+    PJSIP_H_EXPIRES,
+    PJSIP_INV_STATE_CONFIRMED,
+    PJSIP_INV_STATE_INCOMING,
+    PJSIP_OPTIONS_METHOD,
+    PJSIP_PARSE_URI_AS_NAMEADDR,
+    PJSIP_REQUEST_MSG,
+    PJSIP_RESPONSE_MSG,
+    PJSIP_ROLE_UAC,
+    PJSIP_ROLE_UAS,
+    PJSIP_SC_TSX_TIMEOUT,
+    PJSIP_TPSELECTOR_TRANSPORT,
+    PJSIP_TSX_STATE_COMPLETED,
+    PJSIP_TSX_STATE_TERMINATED,
+    PJSIP_TSX_STATE_TRYING,
+    pj_AF_INET,
+    pj_list_init,
+    pj_list_insert_after,
+    pj_mutex_create_recursive,
+    pj_mutex_destroy,
+    pj_mutex_lock,
+    pj_mutex_unlock,
+    pj_strdup2_with_null,
+    pj_time_val,
+    pjmedia_sdp_neg_cancel_offer,
+    pjmedia_sdp_neg_get_active_local,
+    pjmedia_sdp_neg_get_active_remote,
+    pjmedia_sdp_neg_get_neg_local,
+    pjmedia_sdp_neg_get_neg_remote,
+    pjmedia_sdp_neg_get_state,
+    pjmedia_sdp_neg_modify_local_offer,
+    pjmedia_sdp_session,
+    pjsip_auth_clt_set_credentials,
+    pjsip_contact_hdr_create,
+    pjsip_cred_info,
+    pjsip_dlg_create_response,
+    pjsip_dlg_create_uac,
+    pjsip_dlg_create_uas_and_inc_lock,
+    pjsip_dlg_dec_lock,
+    pjsip_dlg_inc_lock,
+    pjsip_dlg_modify_response,
+    pjsip_dlg_send_response,
+    pjsip_dlg_set_route_set,
+    pjsip_dlg_set_transport,
+    pjsip_dlg_terminate,
+    pjsip_endpt_create_response,
+    pjsip_endpt_respond_stateless,
+    pjsip_endpt_send_response2,
+    pjsip_event_hdr,
+    pjsip_event_hdr_create,
+    pjsip_evsub_create_uac,
+    pjsip_evsub_create_uas,
+    pjsip_evsub_get_mod_data,
+    pjsip_evsub_get_state_name,
+    pjsip_evsub_initiate,
+    pjsip_evsub_notify,
+    pjsip_evsub_send_request,
+    pjsip_evsub_set_mod_data,
+    pjsip_evsub_state,
+    pjsip_evsub_terminate,
+    pjsip_evsub_update_expires,
+    pjsip_evsub_user,
+    pjsip_expires_hdr,
+    pjsip_inv_answer,
+    pjsip_inv_cancel_reinvite,
+    pjsip_inv_create_uac,
+    pjsip_inv_create_uas,
+    pjsip_inv_end_session,
+    pjsip_inv_initial_answer,
+    pjsip_inv_invite,
+    pjsip_inv_reinvite,
+    pjsip_inv_send_msg,
+    pjsip_inv_state_name,
+    pjsip_inv_terminate,
+    pjsip_method,
+    pjsip_method_init_np,
+    pjsip_msg_add_hdr,
+    pjsip_msg_body_create,
+    pjsip_msg_find_hdr,
+    pjsip_msg_find_hdr_by_name,
+    pjsip_parse_uri,
+    pjsip_rdata_get_tsx,
+    pjsip_replaces_hdr,
+    pjsip_replaces_hdr_create,
+    pjsip_replaces_verify_request,
+    pjsip_sip_uri,
+    pjsip_tpselector,
+    pjsip_tsx_terminate,
+    pjsip_tx_data,
+    pjsip_tx_data_dec_ref,
+    pjsip_ua_instance,
+    pjsip_uri,
+    pjsip_uri_get_uri,
+)
+
+from .event cimport _add_event
+from .headers cimport (
+    BaseContactHeader,
+    BaseReplacesHeader,
+    ContactHeader,
+    FromHeader,
+    FrozenContactHeader,
+    FrozenFromHeader_create,
+    FrozenRouteHeader,
+    FrozenToHeader,
+    FrozenToHeader_create,
+    Header,
+    ReferToHeader,
+    RouteHeader,
+    ToHeader,
+    _BaseRouteHeader_to_pjsip_route_hdr,
+)
+from .helper cimport (
+    Credentials,
+    FrozenCredentials,
+    FrozenSIPURI,
+    FrozenSIPURI_create,
+    SIPURI,
+)
+from .sdp cimport (
+    BaseSDPSession,
+    FrozenSDPSession,
+    FrozenSDPSession_create,
+    SDPSession,
+    SDPSession_create,
+)
+from .ua cimport (
+    PJSIPUA,
+    Timer,
+    _event_hdr_name,
+    _get_ua,
+    deallocate_weakref,
+    timer_callback,
+)
+from .util cimport  (
+    PJSTR,
+    _add_headers_to_tdata,
+    _dict_to_pjsip_param,
+    _is_valid_ip,
+    _pj_status_to_str,
+    _pj_str_to_str,
+    _pjsip_msg_to_dict,
+    _remove_headers_from_tdata,
+    _str_to_pj_str,
+    frozendict,
+)
+from .referral cimport _refer_event, _refer_method
+from .request cimport EndpointAddress
+
 
 
 # classes
@@ -1857,4 +2024,3 @@ cdef pjsip_evsub_user _incoming_transfer_cb
 _incoming_transfer_cb.on_rx_refresh = _Invitation_transfer_in_cb_rx_refresh
 _incoming_transfer_cb.on_server_timeout = _Invitation_transfer_in_cb_server_timeout
 _incoming_transfer_cb.on_tsx_state = _Invitation_transfer_in_cb_tsx
-

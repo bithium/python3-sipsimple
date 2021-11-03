@@ -1,21 +1,4 @@
-
-include "_core.error.pxi"
-include "_core.lib.pxi"
-include "_core.sound.pxi"
-include "_core.video.pxi"
-include "_core.util.pxi"
-
-include "_core.ua.pxi"
-
-include "_core.event.pxi"
-include "_core.request.pxi"
-include "_core.helper.pxi"
-include "_core.headers.pxi"
-include "_core.subscription.pxi"
-include "_core.invitation.pxi"
-include "_core.referral.pxi"
-include "_core.sdp.pxi"
-include "_core.mediatransport.pxi"
+from ._pjsip cimport PJ_SVN_REV, pj_get_version
 
 # constants
 
@@ -50,5 +33,3 @@ __all__ = ["PJ_VERSION", "PJ_SVN_REVISION", "CORE_REVISION",
            "DialogID",
            "SDPSession", "FrozenSDPSession", "SDPMediaStream", "FrozenSDPMediaStream", "SDPConnection", "FrozenSDPConnection", "SDPAttribute", "FrozenSDPAttribute", "SDPNegotiator",
            "RTPTransport", "AudioTransport", "VideoTransport"]
-
-

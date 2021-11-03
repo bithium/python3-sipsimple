@@ -1,4 +1,7 @@
+# cython: language_level=3
+# distutils: define_macros=CYTHON_NO_PYINIT_EXPORT
 
+from .util cimport _pj_status_to_str
 
 class SIPCoreError(Exception):
     pass
@@ -22,4 +25,3 @@ class PJSIPTLSError(PJSIPError):
 
 class SIPCoreInvalidStateError(SIPCoreError):
     pass
-

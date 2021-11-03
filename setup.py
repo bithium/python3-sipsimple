@@ -5,7 +5,7 @@ import os
 from distutils.core import setup
 from distutils.extension import Extension
 
-from setup_pjsip import PJSIP_build_ext
+from setup_pjsip import build_ext
 
 
 def find_packages(root):
@@ -19,12 +19,11 @@ def find_packages(root):
 class PackageInfo(object):
     def __init__(self, info_file):
         with open(info_file) as f:
-            exec(f.read(), self.__dict__)
+            exec(f.read(), self.__dict__)  # nosec
         self.__dict__.pop("__builtins__", None)
 
-    def __getattribute__(
-        self, name
-    ):  # this is here to silence the IDE about missing attributes
+    def __getattribute__(self, name):
+        # this is here to silence the IDE about missing attributes
         return super(PackageInfo, self).__getattribute__(name)
 
 
@@ -55,8 +54,8 @@ setup(
     ext_modules=[
         Extension(
             name="sipsimple.core._core",
-            sources=["sipsimple/core/_core.pyx", "sipsimple/core/_core.pxd"]
-            + glob.glob(os.path.join("sipsimple", "core", "_core.*.pxi")),
+            sources=[os.path.join("sipsimple", "core", "_core.pyx")]
+            + glob.glob(os.path.join("sipsimple", "core", "*.pyx")),
         ),
         Extension(
             name="sipsimple.util._sha1",
@@ -64,6 +63,6 @@ setup(
             depends=["sipsimple/util/_sha1.h"],
         ),
     ],
-    cmdclass={"build_ext": PJSIP_build_ext},
+    cmdclass={"build_ext": build_ext},
     provides=["sipsimple"],
 )

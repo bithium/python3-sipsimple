@@ -8,7 +8,7 @@ import string
 from application.python.types import MarkerType
 from application.system import host
 
-from sipsimple.core._core import SIPURI
+from sipsimple.core._pjsip import SIPURI
 from sipsimple.core._engine import Engine
 
 

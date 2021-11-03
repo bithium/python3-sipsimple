@@ -1,6 +1,120 @@
+# cython: language_level=3
+# distutils: define_macros=CYTHON_NO_PYINIT_EXPORT
 
 import sys
 
+from libc.stdlib cimport free, malloc
+
+from .error import PJSIPError, PJSIPTLSError, SIPCoreError
+
+from ._pjsip cimport (
+    PJMEDIA_CODEC_MGR_MAX_CODECS,
+    PJMEDIA_SPEEX_NO_NB,
+    PJMEDIA_VID_CODEC_MGR_MAX_CODECS,
+    PJMEDIA_VID_PACKING_PACKETS,
+    PJSIP_SSLV23_METHOD,
+    PJSIP_TLS_ECACERT,
+    PJSIP_TLS_ECERTFILE,
+    PJSIP_TLS_ECIPHER,
+    PJSIP_TLS_ECTX,
+    PJSIP_TLS_EINVMETHOD,
+    PJSIP_TLS_EKEYFILE,
+    PJSIP_TLS_EUNKNOWN,
+    PJSIP_TP_STATE_CONNECTED,
+    PJ_INET6_ADDRSTRLEN,
+    pj_AF_INET,
+    pj_caching_pool,
+    pj_caching_pool_destroy,
+    pj_caching_pool_init,
+    pj_dns_resolver,
+    pj_dns_resolver_set_ns,
+    pj_init,
+    pj_pool_factory_default_policy,
+    pj_pool_release,
+    pj_pool_t,
+    pj_shutdown,
+    pj_sockaddr_get_port,
+    pj_sockaddr_has_addr,
+    pj_sockaddr_in,
+    pj_sockaddr_in_init,
+    pj_sockaddr_print,
+    pj_str_t,
+    pjlib_util_init,
+    pjmedia_audio_codec_config,
+    pjmedia_audio_codec_config_default,
+    pjmedia_codec_ffmpeg_vid_deinit,
+    pjmedia_codec_ffmpeg_vid_init,
+    pjmedia_codec_info,
+    pjmedia_codec_mgr_enum_codecs,
+    pjmedia_codec_mgr_set_codec_priority,
+    pjmedia_codec_register_audio_codecs,
+    pjmedia_codec_vpx_vid_deinit,
+    pjmedia_codec_vpx_vid_init,
+    pjmedia_converter_mgr_create,
+    pjmedia_converter_mgr_destroy,
+    pjmedia_converter_mgr_instance,
+    pjmedia_endpt,
+    pjmedia_endpt_create,
+    pjmedia_endpt_create_pool,
+    pjmedia_endpt_destroy,
+    pjmedia_endpt_get_codec_mgr,
+    pjmedia_event_mgr_create,
+    pjmedia_event_mgr_destroy,
+    pjmedia_event_mgr_instance,
+    pjmedia_vid_codec_info,
+    pjmedia_vid_codec_mgr_create,
+    pjmedia_vid_codec_mgr_destroy,
+    pjmedia_vid_codec_mgr_enum_codecs,
+    pjmedia_vid_codec_mgr_get_default_param,
+    pjmedia_vid_codec_mgr_instance,
+    pjmedia_vid_codec_mgr_set_codec_priority,
+    pjmedia_vid_codec_mgr_set_default_param,
+    pjmedia_vid_codec_param,
+    pjmedia_vid_dev_subsys_init,
+    pjmedia_vid_dev_subsys_shutdown,
+    pjmedia_video_format_mgr_create,
+    pjmedia_video_format_mgr_destroy,
+    pjmedia_video_format_mgr_instance,
+    pjnath_init,
+    pjsip_100rel_init_module,
+    pjsip_endpoint,
+    pjsip_endpt_create,
+    pjsip_endpt_create_pool,
+    pjsip_endpt_create_resolver,
+    pjsip_endpt_destroy,
+    pjsip_endpt_get_resolver,
+    pjsip_endpt_get_tpmgr,
+    pjsip_endpt_release_pool,
+    pjsip_endpt_set_resolver,
+    pjsip_evsub_init_module,
+    pjsip_inv_usage_init,
+    pjsip_replaces_init_module,
+    pjsip_tcp_transport_start2,
+    pjsip_tls_setting,
+    pjsip_tls_setting_default,
+    pjsip_tls_transport_start,
+    pjsip_tpfactory,
+    pjsip_tpmgr,
+    pjsip_tpmgr_set_state_cb,
+    pjsip_transport,
+    pjsip_transport_shutdown,
+    pjsip_transport_state,
+    pjsip_transport_state_info_ptr_const,
+    pjsip_tsx_layer_init_module,
+    pjsip_ua_init_module,
+    pjsip_udp_transport_start,
+)
+from .event cimport _add_event
+from .invitation cimport _inv_cb
+from .util cimport (
+    PJSTR,
+    _buf_to_str,
+    _is_valid_ip,
+    _pj_status_to_str,
+    _pj_str_to_bytes,
+    _pj_str_to_str,
+    _str_to_pj_str,
+)
 
 # classes
 
@@ -348,7 +462,7 @@ cdef class PJMEDIAEndpoint:
         codecs = [list(reversed(codec_data)) for codec_data in self._get_codecs()]
         codecs.sort(reverse=True)
         codec_prio = list()
-        
+
         for codec in req_codecs:
             for sample_rate, channel_count, codec_name, prio in codecs:
                 if codec == codec_name and channel_count == 1:
@@ -514,15 +628,10 @@ cdef class PJMEDIAEndpoint:
 
 
 cdef void _transport_state_cb(pjsip_transport *tp, pjsip_transport_state state, pjsip_transport_state_info_ptr_const info) with gil:
-    cdef PJSIPUA ua
     cdef str local_address
     cdef str remote_address
     cdef char buf[PJ_INET6_ADDRSTRLEN]
     cdef dict event_dict
-    try:
-        ua = _get_ua()
-    except:
-        return
 
     if pj_sockaddr_has_addr(&tp.local_addr):
         pj_sockaddr_print(&tp.local_addr, buf, 512, 0)
@@ -533,7 +642,7 @@ cdef void _transport_state_cb(pjsip_transport *tp, pjsip_transport_state state, 
     transport = tp.type_name.decode().lower()
     remote_address = '%s:%d' % (_pj_str_to_str(tp.remote_name.host), tp.remote_name.port)
     event_dict = dict(transport=transport, local_address=local_address, remote_address=remote_address)
-    
+
     if state == PJSIP_TP_STATE_CONNECTED:
         _add_event("SIPEngineTransportDidConnect", event_dict)
     else:

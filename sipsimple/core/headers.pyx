@@ -1,6 +1,32 @@
+# cython: language_level=3
+# distutils: define_macros=CYTHON_NO_PYINIT_EXPORT
 
 # Classes
 #
+
+from ._pjsip cimport (
+    pj_pool_alloc,
+    pjsip_name_addr,
+    pjsip_param,
+    pjsip_route_hdr_init,
+    pjsip_sip_uri,
+    pjsip_uri,
+    pjsip_uri_get_uri,
+)
+from .helper cimport (
+    FrozenSIPURI,
+    FrozenSIPURI_create,
+    SIPURI,
+    SIPURI_create,
+    _BaseSIPURI_to_pjsip_sip_uri
+)
+from .util cimport (
+    _dict_to_pjsip_param,
+    _pj_str_to_str,
+    _pjsip_param_to_dict,
+    _str_to_pj_str,
+    frozendict,
+)
 
 cdef object BaseHeader_richcmp(object self, object other, int op) with gil:
     if op not in (2, 3):
@@ -1937,3 +1963,15 @@ cdef FrozenReplacesHeader FrozenReplacesHeader_create(pjsip_replaces_hdr *header
     early_only = int(header.early_only)
     return FrozenReplacesHeader(call_id, from_tag, to_tag, early_only, frozendict(parameters))
 
+cdef int _BaseRouteHeader_to_pjsip_route_hdr(BaseIdentityHeader header, pjsip_route_hdr *pj_header, pj_pool_t *pool) except -1:
+    cdef pjsip_param *param
+    cdef pjsip_sip_uri *sip_uri
+    pjsip_route_hdr_init(NULL, <void *> pj_header)
+    sip_uri = <pjsip_sip_uri *> pj_pool_alloc(pool, sizeof(pjsip_sip_uri))
+    _BaseSIPURI_to_pjsip_sip_uri(header.uri, sip_uri, pool)
+
+    pj_header.name_addr.uri = <pjsip_uri *> sip_uri
+    if header.display_name:
+        _str_to_pj_str(header.display_name, &pj_header.name_addr.display)
+    _dict_to_pjsip_param(header.parameters, &pj_header.other_param, pool)
+    return 0

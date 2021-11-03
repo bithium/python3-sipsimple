@@ -1,3 +1,5 @@
+# cython: language_level=3
+# distutils: define_macros=CYTHON_NO_PYINIT_EXPORT
 
 import errno
 import heapq
@@ -9,6 +11,145 @@ import traceback
 import os
 import tempfile
 
+from libc.string cimport memcpy
+
+# Python C imports
+
+from cpython.float cimport PyFloat_AsDouble
+from cpython.ref cimport Py_INCREF, Py_DECREF
+from cpython.bytes cimport PyBytes_AsString
+
+
+
+from .error import PJSIPError, SIPCoreError
+from .util import decode_device_name
+
+from ._pjsip cimport (
+    PJMEDIA_AUD_DEFAULT_CAPTURE_DEV,
+    PJMEDIA_AUD_DEFAULT_PLAYBACK_DEV,
+    PJMEDIA_AUD_DEV_DEFAULT_INPUT_CHANGED,
+    PJMEDIA_AUD_DEV_DEFAULT_OUTPUT_CHANGED,
+    PJMEDIA_AUD_DEV_LIST_DID_REFRESH,
+    PJMEDIA_AUD_DEV_LIST_WILL_REFRESH,
+    PJMEDIA_DIR_CAPTURE,
+    PJMEDIA_DIR_CAPTURE_PLAYBACK,
+    PJMEDIA_VID_DEFAULT_CAPTURE_DEV,
+    PJSIP_H_ACCEPT,
+    PJSIP_H_ALLOW,
+    PJSIP_H_SUPPORTED,
+    PJSIP_H_VIA,
+    PJSIP_INV_SUPPORT_100REL,
+    PJSIP_MAX_ACCEPT_COUNT,
+    PJSIP_MOD_PRIORITY_APPLICATION,
+    PJSIP_MOD_PRIORITY_DIALOG_USAGE,
+    PJSIP_MOD_PRIORITY_TRANSPORT_LAYER,
+    PJSIP_ROLE_UAC,
+    PJ_LOG_HAS_DAY_OF_MON,
+    PJ_LOG_HAS_INDENT,
+    PJ_LOG_HAS_MICRO_SEC,
+    PJ_LOG_HAS_MONTH,
+    PJ_LOG_HAS_SENDER,
+    PJ_LOG_HAS_TIME,
+    PJ_LOG_HAS_YEAR,
+    PJ_LOG_MAX_LEVEL,
+    PJ_STUN_PORT,
+    pj_AF_INET,
+    pj_list,
+    pj_log_get_level,
+    pj_log_set_decor,
+    pj_log_set_level,
+    pj_log_set_log_func,
+    pj_mutex_create_recursive,
+    pj_mutex_create_simple,
+    pj_mutex_destroy,
+    pj_mutex_lock,
+    pj_pool_alloc,
+    pj_pool_reset,
+    pj_rwmutex_create,
+    pj_rwmutex_destroy,
+    pj_rwmutex_lock_read,
+    pj_rwmutex_lock_write,
+    pj_rwmutex_unlock_read,
+    pj_rwmutex_unlock_write,
+    pj_sockaddr_in,
+    pj_sockaddr_in_init,
+    pj_srand,
+    pj_str_t,
+    pj_stun_config_init,
+    pj_stun_detect_nat_type,
+    pj_thread_is_registered,
+    pj_thread_register,
+    pj_time_val,
+    pjmedia_aud_dev_count,
+    pjmedia_aud_dev_event,
+    pjmedia_aud_dev_get_info,
+    pjmedia_aud_dev_info,
+    pjmedia_aud_dev_refresh,
+    pjmedia_aud_dev_set_observer_cb,
+    pjmedia_endpt_get_ioqueue,
+    pjmedia_sdp_attr,
+    pjmedia_sdp_media,
+    pjmedia_sdp_session,
+    pjmedia_vid_dev_count,
+    pjmedia_vid_dev_get_info,
+    pjmedia_vid_dev_info,
+    pjmedia_vid_dev_refresh,
+    pjsip_endpoint,
+    pjsip_endpt_add_capability,
+    pjsip_endpt_create_pool,
+    pjsip_endpt_create_response,
+    pjsip_endpt_get_capability,
+    pjsip_endpt_get_timer_heap,
+    pjsip_endpt_handle_events,
+    pjsip_endpt_register_module,
+    pjsip_endpt_release_pool,
+    pjsip_endpt_send_response2,
+    pjsip_event_hdr,
+    pjsip_evsub_register_pkg,
+    pjsip_generic_string_hdr_create,
+    pjsip_hdr,
+    pjsip_hdr_clone,
+    pjsip_hdr_ptr_const,
+    pjsip_inv_callback,
+    pjsip_inv_verify_request,
+    pjsip_module,
+    pjsip_msg_add_hdr,
+    pjsip_msg_body,
+    pjsip_msg_body_clone,
+    pjsip_msg_find_hdr,
+    pjsip_msg_find_hdr_by_name,
+    pjsip_transaction,
+    pjsip_tsx_create_key,
+    pjsip_tsx_layer_find_tsx,
+    pjsip_tx_data_dec_ref,
+    pjsip_via_hdr,
+)
+from .event cimport (
+    _add_event,
+    _cb_log,
+    _dealloc_handler_queue,
+    _event_queue_lock,
+    _get_clear_event_queue,
+    _post_poll_handler_queue,
+    _process_handler_queue,
+)
+from .headers cimport WarningHeader
+from .invitation cimport Invitation
+from .lib cimport PJLIB, PJCachingPool, PJMEDIAEndpoint, PJSIPEndpoint
+from .referral cimport IncomingReferral
+from .request cimport IncomingRequest, _Request_cb_tsx_state
+from .subscription cimport IncomingSubscription
+from .util cimport (
+    PJSTR,
+    _add_headers_to_tdata,
+    _is_valid_ip,
+    _pj_buf_len_to_str,
+    _pj_str_to_bytes,
+    _pj_str_to_str,
+    _pjsip_msg_to_dict,
+    _str_to_pj_str,
+)
+from .ua cimport timer_callback
 
 cdef class Timer:
     cdef int schedule(self, float delay, timer_callback callback, object obj) except -1:
